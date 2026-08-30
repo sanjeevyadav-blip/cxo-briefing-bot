@@ -24,7 +24,10 @@ OUT_SCRIPT = ROOT / "data" / "script.json"
 OUT_NOTES = ROOT / "data" / "show_notes.md"
 
 TARGET_WORDS = CONFIG["episode"]["target_word_count"]
-MODEL = "llama-3.3-70b-versatile"  # swap freely for any Groq-hosted model
+MODEL = "openai/gpt-oss-120b"  # llama-3.3-70b-versatile was deprecated by Groq
+# on 17 Jun 2026; this is Groq's recommended replacement. Swap freely for
+# any other Groq-hosted model -- check console.groq.com/docs/models for
+# the current list if this one ever gets retired too.
 
 SYSTEM_PROMPT = f"""You write a daily two-host business news podcast script for an Indian
 analytics manager moving toward a Data Science / Head-of-Business career track.
