@@ -1,0 +1,9 @@
+data/*.json
+data/*.txt
+data/*.md
+data/tts_tmp/
+output/*.mp3
+voices/*.onnx
+voices/*.onnx.json
+__pycache__/
+*.pyc
