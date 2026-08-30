@@ -1,0 +1,73 @@
+# CXO Business Briefing Bot -- configuration
+# Nothing secret lives here. Secrets (API keys, email password) go in
+# GitHub repo Settings -> Secrets and variables -> Actions.
+
+rss_feeds:
+  # Free, public RSS -- verify these still resolve before your first run;
+  # publications reorganise feed URLs occasionally.
+  - name: "Economic Times"
+    url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms"
+    tier: 1
+  - name: "Business Standard"
+    url: "https://www.business-standard.com/rss/latest.rss"
+    tier: 1
+  - name: "Mint"
+    url: "https://www.livemint.com/rss/news"
+    tier: 1
+  - name: "BusinessLine"
+    url: "https://www.thehindubusinessline.com/feeder/default.rss"
+    tier: 1
+  - name: "Financial Express"
+    url: "https://www.financialexpress.com/feed/"
+    tier: 2
+  - name: "Business Today"
+    url: "https://www.businesstoday.in/rssfeeds/?id=225346"
+    tier: 2
+
+# The four paywalled sources have no public full-text RSS. As a free
+# workaround we pull their headline + snippet via Google News RSS search
+# (a public feed of headlines/snippets + outbound links -- this does not
+# scrape the paywalled article itself). You will only get a headline and
+# a short snippet for these, not the full article body.
+google_news_topics:
+  - name: "WSJ"
+    query: "site:wsj.com business"
+  - name: "Financial Times"
+    query: "site:ft.com"
+  - name: "Nikkei Asia"
+    query: "site:asia.nikkei.com"
+  - name: "Bloomberg Businessweek"
+    query: "site:bloomberg.com businessweek"
+  - name: "Il Sole 24 Ore"
+    query: "site:ilsole24ore.com"
+
+scoring:
+  weights:
+    cxo_relevance: 0.40
+    career_relevance: 0.25
+    source_recency: 0.20
+    category_fit: 0.15
+  cxo_keywords:
+    ["ceo","cfo","coo","board","ipo","merger","acquisition","funding","valuation",
+     "earnings","guidance","interest rate","inflation","rbi","fed","reserve bank",
+     "regulation","market share","layoffs","capex","revenue","profit","stake",
+     "investment","tariff","gdp","monetary policy","sebi"]
+  career_keywords:
+    ["ai","artificial intelligence","data","analytics","machine learning",
+     "automation","algorithm","digital transformation","llm","generative ai",
+     "data science","cloud","saas"]
+  max_age_hours: 30
+  shortlist_size: 16
+
+episode:
+  target_word_count: 4300
+  host_a_name: "Host A"
+  host_b_name: "Host B"
+  # Voice model short-names -- see scripts/tts_render.py for the download URLs.
+  host_a_voice: "en_US-lessac-medium"
+  host_b_voice: "en_US-ryan-medium"
+
+page:
+  # No email, no SMTP secrets. The pipeline publishes a page to
+  # GitHub Pages instead -- visit it whenever you like.
+  title: "CXO Business Briefing"
