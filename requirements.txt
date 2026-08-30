@@ -1,0 +1,8 @@
+feedparser>=6.0
+requests>=2.31
+pyyaml>=6.0
+python-dateutil>=2.9
+groq>=0.9
+git+https://github.com/myshell-ai/MeloTTS.git
+unidic>=1.1
+pydub>=0.25
