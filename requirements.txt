@@ -1,7 +1,0 @@
-feedparser>=6.0
-requests>=2.31
-pyyaml>=6.0
-python-dateutil>=2.9
-groq>=0.9
-piper-tts>=1.2
-pydub>=0.25
