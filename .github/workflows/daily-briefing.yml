@@ -1,0 +1,93 @@
+name: Daily CXO Business Briefing
+
+on:
+  schedule:
+    # 05:30 UTC = 11:00 IST (India doesn't observe DST, so this is stable
+    # year-round). GitHub's scheduler can run a few minutes late during
+    # peak load -- a documented Actions limitation, not a bug here.
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    # Three videos now: 4 Groq calls each spaced a minute apart to stay
+    # under the free tier's 8000 tokens/minute, plus 3 TTS renders.
+    timeout-minutes: 60
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg, fonts, espeak-ng
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Layer 1 -- fetch business news
+        run: python scripts/fetch_news.py
+
+      - name: Layer 1b -- fetch world news (10 India + 10 global)
+        run: python scripts/fetch_world.py
+
+      - name: Layer 2 -- rank & shortlist
+        run: python scripts/rank_news.py
+
+      - name: Layer 3 -- business script + summaries (Groq)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python scripts/generate_script.py
+
+      - name: Layer 3b -- world news script (Groq)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python scripts/gen_extra.py world
+
+      - name: Layer 3c -- explainer script (Groq)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python scripts/gen_extra.py explainer
+
+      - name: Layer 4 -- render audio (Kokoro)
+        run: |
+          python scripts/tts_render.py business
+          python scripts/tts_render.py world
+          python scripts/tts_render.py explainer
+
+      - name: Layer 5 -- build videos (words on screen, synced to speech)
+        run: |
+          python scripts/make_video.py business
+          python scripts/make_video.py world
+          python scripts/make_video.py explainer
+          ls -lh output/
+
+      - name: Layer 6 -- build the web page
+        run: python scripts/build_page.py
+
+      - name: Commit and push the updated page
+        run: |
+          git config user.name "cxo-briefing-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs
+          git commit -m "Daily briefing: $(date -u +%Y-%m-%d)" || echo "Nothing new to commit"
+          git push
+
+      - name: Upload episodes as a workflow artifact (30-day backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episodes-${{ github.run_id }}
+          path: |
+            output/*.mp4
+            data/show_notes.md
+          retention-days: 30
