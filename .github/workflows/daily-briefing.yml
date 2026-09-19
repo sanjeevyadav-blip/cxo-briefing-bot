@@ -1,0 +1,87 @@
+name: Daily CXO Business Briefing
+
+on:
+  schedule:
+    # 05:30 UTC = 11:00 IST (India doesn't observe DST, so this is stable
+    # year-round). GitHub's scheduler can run a few minutes late during
+    # peak load -- that's a documented GH Actions limitation, not a bug
+    # in this workflow.
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}   # lets you trigger a manual test run from the Actions tab
+
+permissions:
+  contents: write   # lets the workflow commit the built page back to the repo
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45   # MeloTTS (torch-based) is heavier than Piper was
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg + fonts (MP3 export, and video title card)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download unidic (MeloTTS's text-processing dictionary)
+        run: python -m unidic download
+
+      - name: Download NLTK data (MeloTTS's POS tagger + pronunciation dict)
+        run: python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
+
+      - name: Layer 1 -- fetch news
+        run: python scripts/fetch_news.py
+
+      - name: Layer 2 -- rank & shortlist
+        run: python scripts/rank_news.py
+
+      - name: Layer 3 -- generate script (Groq, free tier -- not Claude)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python scripts/generate_script.py
+
+      - name: Layer 4 -- render audio (MeloTTS, open source, Indian-English voice)
+        run: python scripts/tts_render.py
+
+      - name: Layer 5 -- wrap the audio into a video (static title card)
+        run: |
+          FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+          TODAY=$(date -u +%Y-%m-%d)
+          # 2 fps is plenty for a still image: keeps the encode fast and the
+          # video stream tiny, so the file is basically the audio plus a card.
+          # -c:a copy reuses the existing MP3, -shortest ends with the audio.
+          ffmpeg -y -f lavfi -i color=c=0x0d1117:s=1280x720:r=2 \
+            -i output/episode.mp3 \
+            -vf "drawtext=fontfile=$FONT:text='CXO Business Briefing':fontcolor=0xe6edf3:fontsize=58:x=(w-text_w)/2:y=290,drawtext=fontfile=$FONT:text='$TODAY':fontcolor=0x8b949e:fontsize=34:x=(w-text_w)/2:y=380" \
+            -c:v libx264 -preset ultrafast -tune stillimage -pix_fmt yuv420p \
+            -c:a copy -shortest output/episode.mp4
+          ls -lh output/
+
+      - name: Layer 6 -- build the web page (no email, no SMTP secrets)
+        run: python scripts/build_page.py
+
+      - name: Commit and push the updated page
+        run: |
+          git config user.name "cxo-briefing-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs
+          git commit -m "Daily briefing: $(date -u +%Y-%m-%d)" || echo "Nothing new to commit"
+          git push
+
+      - name: Upload episode as a workflow artifact too (30-day backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-${{ github.run_id }}
+          path: |
+            output/episode.mp4
+            data/show_notes.md
+          retention-days: 30
